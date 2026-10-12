@@ -1,0 +1,106 @@
+services:
+  # Identity Provider (Keycloak)
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.1
+    container_name: keycloak-idp
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_RELATIVE_PATH: "/"
+      KC_HOSTNAME: keycloak
+      KC_HOSTNAME_PORT: 8080
+      KC_HOSTNAME_STRICT_BACKCHANNEL: "false"
+    command:
+      - "start-dev"
+      - "--import-realm"
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    ports:
+      - "8080:8080" # Exposed externally so clients/browsers can get JWT tokens
+    networks:
+      - internal-net
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 && echo -e 'GET /realms/master HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'"]
+      interval: 5s
+      timeout: 3s
+      retries: 8
+      start_period: 30s
+
+  # Spring API Gateway (Load Balancer & JWT Enforcement Point)
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    container_name: api-gateway
+    environment:
+      KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/spring-security-realm
+    ports:
+      - "443:8443" # The ONLY service exposing application APIs to the outside world over TLS
+    networks:
+      - internal-net
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      sensitive-data-service-1:
+        condition: service_healthy
+      sensitive-data-service-2:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-k", "-f", "https://localhost:8443/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # Clone 1 of Sensitive Data Service (DDD Backend)
+  sensitive-data-service-1:
+    build:
+      context: .
+      dockerfile: sensitive-data-service/Dockerfile
+    container_name: sensitive-data-service-1
+    environment:
+      KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/spring-security-realm
+    volumes:
+      - ./data:/app/data
+    secrets:
+      - db_aes_key # Key is safely injected into /run/secrets/db_aes_key via tmpfs
+    networks:
+      - internal-net
+    # Note: NO ports mapped to host! Only accessible internally by the Gateway via TLS.
+    healthcheck:
+      test: ["CMD", "curl", "-k", "-f", "https://localhost:8443/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # Clone 2 of Sensitive Data Service (DDD Backend)
+  sensitive-data-service-2:
+    build:
+      context: .
+      dockerfile: sensitive-data-service/Dockerfile
+    container_name: sensitive-data-service-2
+    environment:
+      KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/spring-security-realm
+    volumes:
+      - ./data:/app/data
+    secrets:
+      - db_aes_key # Key is safely injected into /run/secrets/db_aes_key via tmpfs
+    networks:
+      - internal-net
+    # Note: NO ports mapped to host! Only accessible internally by the Gateway via TLS.
+    healthcheck:
+      test: ["CMD", "curl", "-k", "-f", "https://localhost:8443/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+secrets:
+  db_aes_key:
+    file: ./secrets/db_aes_key.txt
+
+networks:
+  internal-net:
+    driver: bridge

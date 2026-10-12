@@ -1,0 +1,29 @@
+# Compiled class and artifact files
+target/
+*.jar
+*.war
+*.ear
+*.class
+
+# Maven
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE and Editor files
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.classpath
+.project
+.settings/
+*.log
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Runtime data & H2 database locks
+data/*.db
+data/*.trace.db

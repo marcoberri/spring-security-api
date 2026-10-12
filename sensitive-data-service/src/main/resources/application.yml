@@ -1,0 +1,53 @@
+server:
+  port: 8443
+  ssl:
+    enabled: true
+    key-store: ${SSL_KEYSTORE:file:keystore.p12}
+    key-store-password: changeit
+    key-store-type: PKCS12
+    key-alias: backend
+
+spring:
+  main:
+    banner-mode: off
+  application:
+    name: sensitive-data-service
+  config:
+    import: "optional:configtree:/run/secrets/"
+  servlet:
+    multipart:
+      max-file-size: 1MB
+      max-request-size: 1MB
+  datasource:
+    url: jdbc:h2:file:/app/data/sensitivedb;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+  h2:
+    console:
+      enabled: false
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak:8080/realms/spring-security-realm}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+
+app:
+  security:
+    db-aes-key: ${db_aes_key:ZDJ0ZXN0S2V5Rm9yQWVzR2NtRW5jcnlwdGlvbjMyQnl0ZXM=}

@@ -1,0 +1,42 @@
+# -------------------------------------------------------------
+# Multi-stage Dockerfile for GraalVM Native Image compilation
+# -------------------------------------------------------------
+FROM maven:3.9.9-eclipse-temurin-21 AS maven-provider
+
+FROM ghcr.io/graalvm/native-image-community:25 AS build
+WORKDIR /app
+
+# Copy Maven from the official provider image (no slow RPM downloads or conflicting JDKs)
+COPY --from=maven-provider /usr/share/maven /usr/share/maven
+ENV MAVEN_HOME=/usr/share/maven
+ENV PATH=$MAVEN_HOME/bin:$PATH
+
+# Copy project descriptors
+COPY pom.xml ./
+COPY sensitive-data-service/pom.xml ./sensitive-data-service/
+COPY api-gateway/pom.xml ./api-gateway/
+
+# Download dependencies
+RUN mvn -B -f pom.xml dependency:go-offline || true
+
+# Copy sources
+COPY sensitive-data-service/src ./sensitive-data-service/src
+COPY api-gateway/src ./api-gateway/src
+
+# Compile GraalVM Native Executable
+RUN mvn clean package -Pnative -pl sensitive-data-service -am -DskipTests
+
+# -------------------------------------------------------------
+# Ultra-lightweight runtime container
+# -------------------------------------------------------------
+FROM debian:bookworm-slim
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y curl ca-certificates && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /app/sensitive-data-service/target/sensitive-data-service /app/sensitive-data-service
+COPY sensitive-data-service/src/main/resources/*.p12 /app/
+
+EXPOSE 8443
+
+ENTRYPOINT ["/app/sensitive-data-service"]

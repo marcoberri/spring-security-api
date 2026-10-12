@@ -1,0 +1,73 @@
+{
+  "realm": "spring-security-realm",
+  "enabled": true,
+  "displayName": "Spring Security Realm",
+  "accessTokenLifespan": 60,
+  "ssoSessionIdleTimeout": 600,
+  "ssoSessionMaxLifespan": 3600,
+  "sslRequired": "none",
+  "roles": {
+    "realm": [
+      {
+        "name": "USER",
+        "description": "Standard User Role"
+      },
+      {
+        "name": "ADMIN",
+        "description": "Administrator Role"
+      }
+    ]
+  },
+  "groups": [],
+  "users": [
+    {
+      "username": "testuser",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Mario",
+      "lastName": "Rossi",
+      "email": "mario.rossi@example.com",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "USER"
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "spring-api-gateway",
+      "name": "Spring API Gateway Client",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "gateway-client-secret-123456",
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "redirectUris": [
+        "*"
+      ],
+      "protocol": "openid-connect",
+      "fullScopeAllowed": true,
+      "protocolMappers": [
+        {
+          "name": "audience-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "sensitive-data-service",
+            "id.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ]
+}

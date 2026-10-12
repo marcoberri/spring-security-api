@@ -1,0 +1,54 @@
+server:
+  port: 8443
+  ssl:
+    enabled: true
+    key-store: ${SSL_KEYSTORE:file:keystore.p12}
+    key-store-password: changeit
+    key-store-type: PKCS12
+    key-alias: gateway
+
+spring:
+  main:
+    banner-mode: off
+  application:
+    name: api-gateway
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak:8080/realms/spring-security-realm}
+  cloud:
+    discovery:
+      client:
+        simple:
+          instances:
+            sensitivedata-service:
+              - uri: https://sensitive-data-service-1:8443
+              - uri: https://sensitive-data-service-2:8443
+    gateway:
+      httpclient:
+        ssl:
+          use-insecure-trust-manager: true
+      routes:
+        - id: sensitive-data-route
+          uri: lb://sensitivedata-service
+          predicates:
+            - Path=/api/v1/sensitive-data/**
+          filters:
+            - TokenRelay=
+            - RemoveRequestHeader=Cookie
+    loadbalancer:
+      health-check:
+        initial-delay: 5s
+        interval: 10s
+        path:
+          sensitivedata-service: /actuator/health
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+  endpoint:
+    health:
+      show-details: always
